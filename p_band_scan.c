@@ -20,13 +20,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+double* filterCoeffs;
 int filter_order;
 int num_bands;
 
 signal* sig;                // signal 
 int vector_len;       // length of the signal vector
 
-double* component_vector;       // the vector that will contain the components of the filtered signal
+int component_width;
+int component_vector_length;
+double** component_vector;       // the vector that will contain the components of the filtered signal
+double* output_vector;
+double** combine_vector;
 
 int num_threads;            // number of threads we will use
 int num_processors;         // number of processors we will use
@@ -36,8 +41,6 @@ pthread_t* tid;             // array of thread ids
 // Function run by each thread
 void* worker(void* arg) {
     long myid     = (long)arg;
-    int blocksize = vector_len / num_threads; // note: floor
-  
     // put ourselves on the desired processor
     cpu_set_t set;
     CPU_ZERO(&set);
@@ -48,40 +51,17 @@ void* worker(void* arg) {
     }
     // This figures out the chunk of the vector I should
   // work on based on my id
-  int mystart = myid * blocksize;
-  int myend   = 0;
-  if (myid == (num_threads - 1)) { // last thread
-    // the last thread will take care of the leftover
-    // elements of the vector, in case num_threads doesn't
-    // divide vector_len
-    // WARNING: this is a suboptimal solution. It means that the last thread
-    // might do much more work than the other threads (up to almost double)
-    // which will slow down the entire job. A better solution would split up
-    // remainder work equally between threads...
-    myend = vector_len;
-  } else {
-    myend = (myid + 1) * blocksize;
-  }
-  double* input_temp
-  double* output_temp
-  convolve(myend - mystart + 1, 
-           ((sig->data) + mystart), 
-           filter_order, 
-           coeffs,
+  int mystart = myid * component_width;
+  int myend   = myid*(component_width + 1);
 
-  )
+  double* output = {component_width * 2};
+  fft_convolute(component_width, 
+               ((sig->data) + mystart), 
+               filter_order, 
+               filterCoeffs,
+               output);
 
-  // Now I sum that chunk and put the result in partial_sum
-  //partial_sum[myid] = 0.0;
-  for (int index = mystart; index < myend; index++) {
-    //partial_sum[myid] += vector[i];
-
-    //convolve_and_compute_power(sig->num_samples,
-    //    sig->data,
-    //   filter_order,
-    //    filter_coeffs,
-    //    &(band_power[band]));
-  }
+  component_vector[myid] = output;
 
   // Done.  The master thread will sum up the partial sums
   pthread_exit(NULL);           // finish - no return value
@@ -100,7 +80,7 @@ int main(int argc, char* argv[]) {
     double Fs        = atof(argv[3]);
     filter_order = atoi(argv[4]);
     num_bands    = atoi(argv[5]);
-    num_threads  = atoi(argv[6]);;            // number of threads we will use
+    num_threads  = atoi(argv[6]);            // number of threads we will use
     num_processors = atoi(argv[7]);           // number of processors we will use
     
     assert(Fs > 0.0);
@@ -145,6 +125,16 @@ int main(int argc, char* argv[]) {
       return -1;
     }
 //////////////////////////////////////////// End Load Correct Signal ///////////////////////////////////////////////////////
+
+component_width = (sig->num_samples) / num_threads;
+int fft_size = 1;
+while(fft_size < component_width){ // find correct component width
+  fft_size *= 2;
+}
+component_width = fft_size;
+component_vector_length = ceil((sig->num_samples) / component_width);
+int last_ele_input_length = sig->num_samples - (component_width * (component_vector_length - 1));
+
 //////////////////////////////////////////// Memory Allocation for threads /////////////////////////////////////////////////
     vector_len  = sig->num_samples;    // length of signal vector 
   
@@ -157,7 +147,19 @@ int main(int argc, char* argv[]) {
     }
 /////////////////////////////////////////////End Memory Allocation for threads///////////////////////////////////////////////
 ///////////////////////////////////////////// Thread Creation and Run //////////////////////////////////////////////////////
-    
+  
+  double Fc        = (sig->Fs) / 2;
+  double bandwidth = Fc / num_bands;
+  filterCoeffs[filter_order + 1];
+  double band_power[num_bands];
+  combine_vector[num_bands];
+  for(int band = 0; band < num_bands; band++) {
+    generate_band_pass(sig->Fs,
+      band * bandwidth + 0.0001, // keep within limits
+      (band + 1) * bandwidth - 0.0001,
+      filter_order,
+      filterCoeffs);
+    hamming_window(filter_order,filterCoeffs);
     // launch threads
     // thread i will compute partial_sum[i], which will sum
     // vector[i*ceiling(vector_size/num_threads)
@@ -175,7 +177,6 @@ int main(int argc, char* argv[]) {
         exit(-1);
       }
     }
-  
     // now we will join all the threads
     for (int i = 0; i < num_threads; i++) {
       int returncode = pthread_join(tid[i], NULL);
@@ -184,6 +185,22 @@ int main(int argc, char* argv[]) {
         exit(-1);
       }
     }
+
+    for(int ii = 0; ii < component_vector_length-1; ii++){ //all but last element
+      for(int jj = 0; jj < component_width*2; jj++){
+        output_vector[(ii*component_width)+jj] += component_vector[ii][jj];
+      }
+    }
+
+    int last_ele_length = sizeof(component_vector[component_vector_length-1]);
+    int counter = 0;
+    for(int ii = sizeof(output_vector) - (last_ele_input_length + filter_order); ii < sizeof(output_vector); ii++){
+      output_vector[ii] += component_vector[component_width - 1][counter];
+      counter++;
+    }
+
+    combine_vector[band] = output_vector;
+  }
   ////////////////////////////////////////////// End Thread Creation and Run //////////////////////////////////////
   ////////////////////////////////////////////// Combine Thread Results ///////////////////////////////////////////
     // Now we know that the partial_sums are done, so we'll add them up

@@ -140,9 +140,9 @@ int convolve_and_compute_power(int length, double input_signal[],
 }
 
 // Fast Fourier Transform Convolution using FFTW3
-void fft_convolve_and_compute_power(int length, double input_signal[],
+int fft_convolute(int length, double input_signal[],
                                     int order, double coeffs[],
-                                    double* power) {
+                                    double output_signal[]) {
   //find the smallest size to zero pad my signal to ensure that we are about to do dft properly.
   int fft_size = 1; 
   while(fft_size < length + order) {
@@ -153,7 +153,6 @@ void fft_convolve_and_compute_power(int length, double input_signal[],
   fftw_complex *input_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
   fftw_complex *coeff_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
   fftw_complex *output_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
-  double *output_signal = malloc(sizeof(double) * fft_size);
 
   //Create the FFT Plans and run FFT 
   fftw_plan *fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, input_signal, input_frequency, FFTW_ESTIMATE);
@@ -173,13 +172,6 @@ void fft_convolve_and_compute_power(int length, double input_signal[],
   //Inverse FFT
   fftw_execute(rev_fft_input);
 
-  //Compute Power
-  double pow_sum = 0;
-    for (int i = 0; i < length; i++) {
-        output_signal[i] /= fft_size;  // Normalize after IFFT
-        pow_sum += output_signal[i] * output_signal[i];
-    }
-    *power = pow_sum / length;
 
   //Free memory
   fftw_destroy_plan(fwd_fft_coeff);
@@ -188,9 +180,8 @@ void fft_convolve_and_compute_power(int length, double input_signal[],
   fftw_free(input_frequency);
   fftw_free(coeff_frequency);
   fftw_free(output_frequency);
-  free(output_signal);
 
-  
+  return 0;
 }
 /* below taken from http://www.exstrom.com/journal/sigproc/liir.c */
 

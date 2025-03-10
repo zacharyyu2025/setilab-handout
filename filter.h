@@ -75,7 +75,9 @@ void filter(int ord, double* a, double* b,
 void filtfilt(int ord, double* a, double* b,
               int np, double* x, double* y);
 /*Fast Fourier Transform using FFTW3*/
- void fft_convolve_and_compute_power() {
+int fft_convolute(int length, double input_signal[],
+                                    int order, double coeffs[],
+                                    double* output_signal[]) {
  }
 
 #endif

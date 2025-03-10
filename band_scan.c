@@ -57,7 +57,19 @@ void remove_dc(double* data, int num) {
   }
 }
 
-
+/*
+1. remove the dc component from each data point
+2. find the average signal power
+3. print average signal power to console
+4. get the start resources and start the process
+5. find start time
+6. get the start cycle count
+7. make the filter
+8. convolution
+9. find teh end time and cycle count
+10. get the end resources and end the process
+11. print the results
+*/
 int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, double* ub) {
 
   double Fc        = (sig->Fs) / 2;

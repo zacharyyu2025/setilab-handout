@@ -26,7 +26,7 @@ int num_bands;
 signal* sig;                // signal 
 int vector_len;       // length of the signal vector
 
-double* vector;       // the vector that will contain the filtered signal
+double* component_vector;       // the vector that will contain the components of the filtered signal
 
 int num_threads;            // number of threads we will use
 int num_processors;         // number of processors we will use
@@ -62,17 +62,25 @@ void* worker(void* arg) {
   } else {
     myend = (myid + 1) * blocksize;
   }
+  double* input_temp
+  double* output_temp
+  convolve(myend - mystart + 1, 
+           ((sig->data) + mystart), 
+           filter_order, 
+           coeffs,
+
+  )
 
   // Now I sum that chunk and put the result in partial_sum
   //partial_sum[myid] = 0.0;
   for (int index = mystart; index < myend; index++) {
     //partial_sum[myid] += vector[i];
 
-    convolve_and_compute_power(sig->num_samples,
-        sig->data,
-        filter_order,
-        filter_coeffs,
-        &(band_power[band]));
+    //convolve_and_compute_power(sig->num_samples,
+    //    sig->data,
+    //   filter_order,
+    //    filter_coeffs,
+    //    &(band_power[band]));
   }
 
   // Done.  The master thread will sum up the partial sums
@@ -140,10 +148,10 @@ int main(int argc, char* argv[]) {
 //////////////////////////////////////////// Memory Allocation for threads /////////////////////////////////////////////////
     vector_len  = sig->num_samples;    // length of signal vector 
   
-    vector      = (double*)malloc(sizeof(double) * vector_len);
+    component_vector      = (double*)malloc(sizeof(double) * vector_len);
     tid         = (pthread_t*)malloc(sizeof(pthread_t) * num_threads);
   
-    if (!vector || !tid) {
+    if (!component_vector || !tid) {
       fprintf(stderr, "cannot allocate memory\n");
       exit(-1);
     }

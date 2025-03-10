@@ -74,8 +74,9 @@ void filter(int ord, double* a, double* b,
 /* y = filtfilt(b, a, x) */
 void filtfilt(int ord, double* a, double* b,
               int np, double* x, double* y);
-
-
+/*Fast Fourier Transform using FFTW3*/
+ void fft_convolve_and_compute_power() {
+ }
 
 #endif
 

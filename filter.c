@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <fftw3.h>
 
 #include "filter.h"
 
@@ -138,6 +139,59 @@ int convolve_and_compute_power(int length, double input_signal[],
   return 0;
 }
 
+// Fast Fourier Transform Convolution using FFTW3
+void fft_convolve_and_compute_power(int length, double input_signal[],
+                                    int order, double coeffs[],
+                                    double* power) {
+  //find the smallest size to zero pad my signal to ensure that we are about to do dft properly.
+  int fft_size = 1; 
+  while(fft_size < length + order) {
+    fft_size*=2;
+  }
+
+  //create the frequency for input output and coeff
+  fftw_complex *input_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
+  fftw_complex *coeff_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
+  fftw_complex *output_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
+  double *output_signal = malloc(sizeof(double) * fft_size);
+
+  //Create the FFT Plans and run FFT 
+  fftw_plan *fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, input_signal, input_frequency, FFTW_ESTIMATE);
+  fftw_plan *fwd_fft_coeff = fftw_plan_dft_r2c_1d(fft_size, coeffs, coeff_frequency, FFTW_ESTIMATE);
+  fftw_plan *rev_fft_input = fftw_plan_dft_r2c_1d(fft_size, output_frequency, output_signal, FFTW_ESTIMATE);
+
+  fftw_execute(fwd_fft_input);
+  fftw_execute(fwd_fft_coeff);
+
+  //Multiple in Frequency Domain
+  for (int i = 0; i < fft_size / 2 + 1; i++) {
+    output_frequency[i][0] = input_frequency[i][0] * coeff_frequency[i][0] - input_frequency[i][1] * coeff_frequency[i][1];  // Real part
+    output_frequency[i][1] = input_frequency[i][0] * coeff_frequency[i][1] + input_frequency[i][1] * coeff_frequency[i][0];  // Imaginary part
+  }
+
+
+  //Inverse FFT
+  fftw_execute(rev_fft_input);
+
+  //Compute Power
+  double pow_sum = 0;
+    for (int i = 0; i < length; i++) {
+        output_signal[i] /= fft_size;  // Normalize after IFFT
+        pow_sum += output_signal[i] * output_signal[i];
+    }
+    *power = pow_sum / length;
+
+  //Free memory
+  fftw_destroy_plan(fwd_fft_coeff);
+  fftw_destroy_plan(fwd_fft_input);
+  fftw_destroy_plan(rev_fft_input);
+  fftw_free(input_frequency);
+  fftw_free(coeff_frequency);
+  fftw_free(output_frequency);
+  free(output_signal);
+
+  
+}
 /* below taken from http://www.exstrom.com/journal/sigproc/liir.c */
 
 /**********************************************************************

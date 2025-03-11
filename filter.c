@@ -44,6 +44,11 @@ int generate_high_pass(double Fs, double Fc,
 int generate_band_pass(double Fs, double Fcl, double Fch,
                        int order, double coeffs[]) {
   assert(order > 0 && !(order & 0x1));
+  assert(Fs > 0);
+  assert(Fcl > 0);
+  assert(Fcl < Fs/2);
+  assert(Fch > 0);
+  assert(Fch < Fs/2);
   assert(Fs > 0 && Fcl > 0 && Fcl < Fs / 2 && Fch > 0 && Fch < Fs / 2);
 
   double Ftl = Fcl / Fs;
@@ -155,9 +160,9 @@ int fft_convolute(int length, double input_signal[],
   fftw_complex *output_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
 
   //Create the FFT Plans and run FFT 
-  fftw_plan *fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, input_signal, input_frequency, FFTW_ESTIMATE);
-  fftw_plan *fwd_fft_coeff = fftw_plan_dft_r2c_1d(fft_size, coeffs, coeff_frequency, FFTW_ESTIMATE);
-  fftw_plan *rev_fft_input = fftw_plan_dft_r2c_1d(fft_size, output_frequency, output_signal, FFTW_ESTIMATE);
+  fftw_plan fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, input_signal, input_frequency, FFTW_ESTIMATE);
+  fftw_plan fwd_fft_coeff = fftw_plan_dft_r2c_1d(fft_size, coeffs, coeff_frequency, FFTW_ESTIMATE);
+  fftw_plan rev_fft_input = fftw_plan_dft_r2c_1d(fft_size, output_signal, output_frequency, FFTW_ESTIMATE);
 
   fftw_execute(fwd_fft_input);
   fftw_execute(fwd_fft_coeff);

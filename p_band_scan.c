@@ -2,6 +2,7 @@
 #include <sched.h>    // for processor affinity
 #include <unistd.h>   // unix standard apis
 #include <pthread.h>  // pthread api
+#include <math.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -86,7 +87,7 @@ void remove_dc(double* data, int num) {
 
 
 void* worker(void* arg) {
-  int blocksize = vector_len / num_threads; // note: floor
+  //int blocksize = vector_len / num_threads; // note: floor
   inputs *input = (inputs*)arg;
   int myid = input->id;
 
@@ -162,52 +163,38 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
   double filter_coeffs[filter_order + 1];
   double band_power[num_bands];
 
-  unsigned long long start = rdtsc();
+  //unsigned long long start = rdtsc();
   double hold_num_bands = (double)num_bands;
   double hold_num_threads = (double)num_threads;
   for (int group = 0; group < ceil(hold_num_bands/hold_num_threads); group++) {
-    // Make the filter
-    /* generate_band_pass(sig->Fs,
-                       band * bandwidth + 0.0001, // keep within limits
-                       (band + 1) * bandwidth - 0.0001,
-                       filter_order,
-                       filter_coeffs);
-    hamming_window(filter_order,filter_coeffs); */
-
-  // launch threads
-  // thread i will compute partial_sum[i], which will sum
-  // vector[i*ceiling(vector_size/num_threads)
-  //          through
-  //        (i+1)*floor(vector_size/num_threads) ]
-  // the last thread will also handle the additional elements
-  for (long i = 0; i < num_threads; i++) {
-    inputs* thread_inputs = malloc(sizeof(inputs));
-    thread_inputs -> id = (group * num_bands)+i;
-    thread_inputs->bandwidth = bandwidth;
-    thread_inputs->filterOrder = filter_order;
-    thread_inputs->filterCoeffs = filter_coeffs;
-    thread_inputs->sig = sig;
-    thread_inputs->band_power = band_power;
-    thread_inputs->num_band = num_bands;
-    int returncode = pthread_create(&(tid[i]),  // thread id gets put here
-                                    NULL, // use default attributes
-                                    worker, // thread will begin in this function
-                                    (void*)thread_inputs // we'll give it i as the argument
-                                    );
-    if (returncode != 0) {
-      perror("Failed to start thread");
-      exit(-1);
+    for (long i = 0; i < num_threads; i++) {
+      inputs* thread_inputs = malloc(sizeof(inputs));
+      thread_inputs -> id = (group * num_bands)+i;
+      thread_inputs->bandwidth = bandwidth;
+      thread_inputs->filterOrder = filter_order;
+      thread_inputs->filterCoeffs = filter_coeffs;
+      thread_inputs->sig = sig;
+      thread_inputs->band_power = band_power;
+      thread_inputs->num_band = num_bands;
+      int returncode = pthread_create(&(tid[i]),  // thread id gets put here
+                                      NULL, // use default attributes
+                                      worker, // thread will begin in this function
+                                      (void*)thread_inputs 
+                                      );
+      if (returncode != 0) {
+        perror("Failed to start thread");
+        exit(-1);
+      }
     }
-  }
 
-  // now we will join all the threads
-  for (int i = 0; i < num_threads; i++) {
-    int returncode = pthread_join(tid[i], NULL);
-    if (returncode != 0) {
-      perror("join failed");
-      exit(-1);
+    // now we will join all the threads
+    for (int i = 0; i < num_threads; i++) {
+      int returncode = pthread_join(tid[i], NULL);
+      if (returncode != 0) {
+        perror("join failed");
+        exit(-1);
+      }
     }
-  }
 
   }
 

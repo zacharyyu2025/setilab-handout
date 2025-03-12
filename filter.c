@@ -52,8 +52,7 @@ int generate_band_pass(double Fs, double Fcl, double Fch,
   assert(Fs > 0 && Fcl > 0 && Fcl < Fs / 2 && Fch > 0 && Fch < Fs / 2);
 
   double Ftl = Fcl / Fs;
-  double Fth = Fch / Fs;
-  printf("preloop\n");        
+  double Fth = Fch / Fs;       
   for (int n = 0; n <= order; n++) {
     if (n == order / 2) {
       coeffs[n] = 2 * (Fth - Ftl);
@@ -156,16 +155,35 @@ int fft_convolute(int length, double input_signal[],
   while(fft_size <= length + order) {
     fft_size*=2;
   }
+  printf("Padding begin\n");
+  double* padded_input = fftw_alloc_real(fft_size);
+  double* padded_coeffs = fftw_alloc_real(fft_size);
+  printf("Zero Fill begin\n");
+  // Zero-fill the arrays
+  memset(padded_input, 0, sizeof(double) * fft_size);
+  memset(padded_coeffs, 0, sizeof(double) * fft_size);
+  printf("%d\n", input_signal);
+  if (!input_signal) {
+    printf("Error: input_signal or coeffs is NULL\n");
+    return -1;
+}
+if (!coeffs) {
+  printf("Error: input_signal or coeffs is NULL\n");
+  return -1;
+}
+  printf("memory copy begin\n");
+  memcpy(padded_input, input_signal, sizeof(double)*length);
+  memcpy(padded_coeffs, coeffs, sizeof(double)*order);
   printf("prefrequencies\n");
   //create the frequency for input output and coeff
   fftw_complex *input_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
   fftw_complex *coeff_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
   fftw_complex *output_frequency = fftw_malloc(sizeof(fftw_complex)*fft_size);
   printf("presetup\n");
-  //Create the FFT Plans and run FFT 
-  fftw_plan fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, input_signal, input_frequency, FFTW_ESTIMATE);
-  fftw_plan fwd_fft_coeff = fftw_plan_dft_r2c_1d(fft_size, coeffs, coeff_frequency, FFTW_ESTIMATE);
-  fftw_plan rev_fft_input = fftw_plan_dft_r2c_1d(fft_size, output_signal, output_frequency, FFTW_ESTIMATE);
+  //Create the FFT Plans and run FFT
+  fftw_plan fwd_fft_input = fftw_plan_dft_r2c_1d(fft_size, padded_input, input_frequency, FFTW_ESTIMATE);
+  fftw_plan fwd_fft_coeff = fftw_plan_dft_r2c_1d(fft_size, padded_coeffs, coeff_frequency, FFTW_ESTIMATE);
+  fftw_plan rev_fft_input = fftw_plan_dft_c2r_1d(fft_size, output_frequency, output_signal, FFTW_ESTIMATE);
   printf("preexecute\n");
   fftw_execute(fwd_fft_input);
   printf("precoeff");
@@ -176,7 +194,6 @@ int fft_convolute(int length, double input_signal[],
     output_frequency[i][0] = input_frequency[i][0] * coeff_frequency[i][0] - input_frequency[i][1] * coeff_frequency[i][1];  // Real part
     output_frequency[i][1] = input_frequency[i][0] * coeff_frequency[i][1] + input_frequency[i][1] * coeff_frequency[i][0];  // Imaginary part
   }
-
   printf("preinverse\n");
   //Inverse FFT
   fftw_execute(rev_fft_input);

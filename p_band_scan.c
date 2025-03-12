@@ -36,6 +36,7 @@ typedef struct inputs{
   double* filterCoeffs;
   signal* sig;
   double* band_power;
+  int num_band;
 } inputs;
 
 void usage() {
@@ -98,19 +99,24 @@ void* worker(void* arg) {
     exit(-1);
   }
 
-
-  generate_band_pass(input->sig->Fs,
-                       myid * input->bandwidth + 0.0001, // keep within limits
-                       (myid + 1) * input->bandwidth - 0.0001,
-                       input->filterOrder,
-                       input->filterCoeffs);
-  hamming_window(input->filterOrder,input->filterCoeffs);
-
-  fft_convolute_and_compute()
+  if(myid <= input->num_band - 1){
+    generate_band_pass(input->sig->Fs,
+                        myid * input->bandwidth + 0.0001, // keep within limits
+                        (myid + 1) * input->bandwidth - 0.0001,
+                        input->filterOrder,
+                        input->filterCoeffs);
+    hamming_window(input->filterOrder,input->filterCoeffs);
+  
+  
+    fft_convolute_and_compute(sizeof(input->sig->data),
+                              input->sig->data,
+                              input->filterOrder,
+                              input->filterCoeffs,
+                              &(input->band_power[myid]));
+  }
 
   // Done.  The master thread will sum up the partial sums
   pthread_exit(NULL);           // finish - no return value
-
 }
 
 unsigned long long int rdtsc(void) {
@@ -176,12 +182,13 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
   // the last thread will also handle the additional elements
   for (long i = 0; i < num_threads; i++) {
     inputs* thread_inputs = malloc(sizeof(inputs));
-    thread_inputs -> id = i;
+    thread_inputs -> id = (group * num_bands)+i;
     thread_inputs->bandwidth = bandwidth;
     thread_inputs->filterOrder = filter_order;
     thread_inputs->filterCoeffs = filter_coeffs;
     thread_inputs->sig = sig;
     thread_inputs->band_power = band_power;
+    thread_inputs->num_band = num_bands;
     int returncode = pthread_create(&(tid[i]),  // thread id gets put here
                                     NULL, // use default attributes
                                     worker, // thread will begin in this function

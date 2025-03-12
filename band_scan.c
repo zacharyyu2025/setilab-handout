@@ -82,7 +82,7 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
   printf("signal average power:     %lf\n", signal_power);
 
   resources rstart;
-  get_resources(&rstart,THIS_PROCESS);
+  get_resources(&rstart,THIS_PROCESS);  
   double start = get_seconds();
   unsigned long long tstart = get_cycle_count();
 

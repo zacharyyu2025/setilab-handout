@@ -20,7 +20,7 @@
 #define ALIENS_HIGH 150000.0
 
 
-double* filterCoeffs;
+double filterCoeffs[1000];
 int filter_order;
 int num_bands;
 
@@ -84,7 +84,7 @@ void remove_dc(double* data, int num) {
 }
 
 // Function run by each thread
-void* worker(void* arg) {
+void* worker(void* arg, double* filterCoeffs) {
     long myid     = (long)arg;
     // put ourselves on the desired processor
     cpu_set_t set;
@@ -213,12 +213,14 @@ int last_ele_input_length = sig->num_samples - (component_width * (component_vec
 
   for(int band = 0; band < num_bands; band++) {
     printf("gen bandpass\n");
+    printf("order: %d\n", filter_order);
     generate_band_pass(sig->Fs,
       band * bandwidth + 0.0001, // keep within limits
       (band + 1) * bandwidth - 0.0001,
       filter_order,
       filterCoeffs);
     printf("pre hamming\n");
+    printf("order after: %d\n", filter_order);
     hamming_window(filter_order,filterCoeffs);
     printf("post hamming\n");
     // launch threads

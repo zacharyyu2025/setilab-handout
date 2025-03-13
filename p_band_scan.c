@@ -25,10 +25,6 @@ int fft_size;
 int vector_len;       // length of vector we will sum
 double* vector;       // the vector we will sum
 
-int num_threads;            // number of threads we will use
-int num_processors;         // number of processors we will use
-pthread_t* tid;             // array of thread ids
-double* partial_sum;        // partial sums, one for each processor
 
 typedef struct inputs{
   int id;
@@ -90,6 +86,8 @@ void* worker(void* arg) {
   //int blocksize = vector_len / num_threads; // note: floor
   inputs *input = (inputs*)arg;
   int myid = input->id;
+  //printf("myid: %d\n", myid);
+  
 
   // put ourselves on the desired processor
   cpu_set_t set;
@@ -109,13 +107,13 @@ void* worker(void* arg) {
     hamming_window(input->filterOrder,input->filterCoeffs);
   
   
-    fft_convolute_and_compute(sizeof(input->sig->data),
+    convolve_and_compute_power(input->sig->num_samples,
                               input->sig->data,
                               input->filterOrder,
                               input->filterCoeffs,
                               &(input->band_power[myid]));
   }
-
+  free(input); // prevent memory leak
   // Done.  The master thread will sum up the partial sums
   pthread_exit(NULL);           // finish - no return value
 }
@@ -161,15 +159,16 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
   unsigned long long tstart = get_cycle_count();
 
   double filter_coeffs[filter_order + 1];
-  double band_power[num_bands];
-
+  double* band_power = malloc(num_bands * sizeof(double));
+  
   //unsigned long long start = rdtsc();
   double hold_num_bands = (double)num_bands;
   double hold_num_threads = (double)num_threads;
+  pthread_t* tid = malloc(num_threads * sizeof(pthread_t));             // array of thread ids
   for (int group = 0; group < ceil(hold_num_bands/hold_num_threads); group++) {
     for (long i = 0; i < num_threads; i++) {
       inputs* thread_inputs = malloc(sizeof(inputs));
-      thread_inputs -> id = (group * num_bands)+i;
+      thread_inputs -> id = (group * num_threads)+i;
       thread_inputs->bandwidth = bandwidth;
       thread_inputs->filterOrder = filter_order;
       thread_inputs->filterCoeffs = filter_coeffs;
@@ -267,6 +266,8 @@ Context switches %ld\n",
          tend - tstart, cycles_to_seconds(tend - tstart), timing_overhead());
   printf("Analysis took %lf seconds by basic timing\n", end - start);
 
+  free(tid);
+  free(band_power);
   return wow;
 }
 

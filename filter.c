@@ -56,9 +56,11 @@ int generate_band_pass(double Fs, double Fcl, double Fch,
   for (int n = 0; n <= order; n++) {
     if (n == order / 2) {
       coeffs[n] = 2 * (Fth - Ftl);
+      //printf("Coeff: %d --> %lf\n", n, coeffs[n]);
     } else {
       coeffs[n] = (sin(2 * M_PI * Fth * (n - order / 2)) / (M_PI * (n - order / 2))) -
                   (sin(2 * M_PI * Ftl * (n - order / 2)) / (M_PI * (n - order / 2)));
+      //printf("Coeff: %d --> %lf\n", n, coeffs[n]);
     }
   }
   return 0;

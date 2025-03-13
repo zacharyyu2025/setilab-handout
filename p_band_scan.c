@@ -113,6 +113,7 @@ void* worker(void* arg) {
                               input->filterCoeffs,
                               &(input->band_power[myid]));
   }
+  free(input->filterCoeffs); 
   free(input); // prevent memory leak
   // Done.  The master thread will sum up the partial sums
   pthread_exit(NULL);           // finish - no return value
@@ -155,11 +156,14 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
 
   resources rstart;
   get_resources(&rstart,THIS_PROCESS);
-  double start = get_seconds();
+  double time_start = get_seconds();
   unsigned long long tstart = get_cycle_count();
 
-  double filter_coeffs[filter_order + 1];
+  
   double* band_power = malloc(num_bands * sizeof(double));
+  for(int band_index = 0; band_index < num_bands; band_index++){
+    band_power[band_index] = -1;
+  }
   
   //unsigned long long start = rdtsc();
   double hold_num_bands = (double)num_bands;
@@ -171,7 +175,7 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
       thread_inputs -> id = (group * num_threads)+i;
       thread_inputs->bandwidth = bandwidth;
       thread_inputs->filterOrder = filter_order;
-      thread_inputs->filterCoeffs = filter_coeffs;
+      thread_inputs->filterCoeffs = malloc((filter_order+1)*sizeof(double));
       thread_inputs->sig = sig;
       thread_inputs->band_power = band_power;
       thread_inputs->num_band = num_bands;
@@ -198,7 +202,7 @@ int analyze_signal(signal* sig, int filter_order, int num_bands, double* lb, dou
   }
 
   unsigned long long tend = get_cycle_count();
-  double end = get_seconds();
+  double time_end = get_seconds();
 
   resources rend;
   get_resources(&rend,THIS_PROCESS);
@@ -264,7 +268,7 @@ Context switches %ld\n",
   printf("Analysis took %llu cycles (%lf seconds) by cycle count, timing overhead=%llu cycles\n"
          "Note that cycle count only makes sense if the thread stayed on one core\n",
          tend - tstart, cycles_to_seconds(tend - tstart), timing_overhead());
-  printf("Analysis took %lf seconds by basic timing\n", end - start);
+  printf("Analysis took %lf seconds by basic timing\n", time_end - time_start);
 
   free(tid);
   free(band_power);
